@@ -18,25 +18,23 @@ def list_services():
         typer.echo(f"{name}: {svc['owner']}/{svc['repo']} ({svc['workflow']})")
 
 @app.command()
-def trigger(service: str, ref: str | None = None):
-    """Trigger a workflow for the given service."""
+def trigger_all(ref: str = "main"):
+    """Trigger workflows for all services in services.yml."""
     services = load_config()
-    if service not in services:
-        typer.echo(f"Unknown service: {service}")
-        raise typer.Exit(code=1)
-
-    svc = services[service]
     client = GitHubActionsClient()
 
-    data = {
-        "ref": ref or svc.get("branch", "main"),
-        "inputs": {},
-    }
-    path = f"/repos/{svc['owner']}/{svc['repo']}/actions/workflows/{svc['workflow']}/dispatches"
-    client._request("POST", path, json=data)
-    typer.echo(f"Triggered {service} on {data['ref']}")
+    for name, svc in services.items():
+        data = {
+            "ref": ref or svc.get("branch", "main"),
+            "inputs": {},
+        }
+        path = f"/repos/{svc['owner']}/{svc['repo']}/actions/workflows/{svc['workflow']}/dispatches"
+        try:
+            client._request("POST", path, json=data)
+            typer.echo(f"[OK] Triggered {name} on {data['ref']}")
+        except Exception as e:
+            typer.echo(f"[ERR] Failed to trigger {name}: {e}")
 
-@app.command()
 @app.command()
 def last_runs(service: str, limit: int = 5):
     """Show last workflow runs and conclusions."""
@@ -119,5 +117,23 @@ def metrics(service: str, limit: int = 20):
     if last_failure_reason:
         typer.echo(f"Last failure: {last_failure_reason}")
 
+@app.command()
+def fleet_metrics(limit: int = 10):
+    """Show success rate and avg duration for all services."""
+    services = load_config()
+    client = GitHubActionsClient()
+
+    for name, svc in services.items():
+        path = f"/repos/{svc['owner']}/{svc['repo']}/actions/workflows/{svc['workflow']}/runs"
+        data = client._request("GET", path, params={"per_page": limit})
+        runs = data.get("workflow_runs", [])
+        if not runs:
+            typer.echo(f"{name}: no runs")
+            continue
+
+        total = len(runs)
+        successes = [r for r in runs if r["conclusion"] == "success"]
+        success_rate = len(successes) / total * 100
+        typer.echo(f"{name}: success={success_rate:.1f}% over last {total} runs")
 if __name__ == "__main__":
     app()
