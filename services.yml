@@ -1,0 +1,6 @@
+services:
+  example-service:
+    owner: your-username
+    repo: some-repo-with-actions
+    workflow: ci.yml
+    branch: main
