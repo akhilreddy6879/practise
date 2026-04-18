@@ -1,6 +1,6 @@
 services:
-  example-service:
-    owner: your-username
-    repo: some-repo-with-actions
-    workflow: ci.yml
+  practise:
+    owner: akhilreddy6879
+    repo: practise
+    workflow: ci.yaml
     branch: main
